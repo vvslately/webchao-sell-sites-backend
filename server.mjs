@@ -395,7 +395,7 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
           // Insert into categories table
           const [categoryResult] = await connection.execute(
             'INSERT INTO categories (customer_id, title, subtitle, image, category, featured, isActive, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [customerId.toString(), `${website_name} Category`, `Category for ${website_name}`, `https://pic.in.th/image/1640x500.yBF94O`, `${website_name.toLowerCase()}_category`, 0, 1, 0]
+            [customerId.toString(), `${website_name} Category`, `Category for ${website_name}`, `https://img2.pic.in.th/pic/1640x500ebe7d18bc84a1cf6.png`, `${website_name.toLowerCase()}_category`, 0, 1, 0]
           );
           const categoryId = categoryResult.insertId;
           console.log(`Inserted category for customer_id: ${customerId}`);
@@ -432,14 +432,14 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
           // Insert sample product
           await connection.execute(
             'INSERT INTO products (customer_id, category_id, title, subtitle, price, reseller_price, stock, duration, image, download_link, isSpecial, featured, isActive, isWarrenty, warrenty_text, primary_color, secondary_color, priority, discount_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [customerId.toString(), categoryId, 'Sample Product', 'This is a sample product for your new site', 10.00, 8.00, 100, '30 days', `https://pic.in.th/image/1500x1500.yBFPCP`, null, 0, 1, 1, 0, null, '#ff0000', '#b3ffc7', 0, 0]
+            [customerId.toString(), categoryId, 'Sample Product', 'This is a sample product for your new site', 10.00, 8.00, 100, '30 days', `https://img5.pic.in.th/file/secure-sv1/1500x1500232d3d161739dfd2.png`, null, 0, 1, 1, 0, null, '#ff0000', '#b3ffc7', 0, 0]
           );
           console.log(`Inserted sample product for customer_id: ${customerId}`);
 
           // Insert config data
           await connection.execute(
             'INSERT INTO config (customer_id, owner_phone, site_name, site_logo, meta_title, meta_description, meta_keywords, meta_author, discord_link, discord_webhook, banner_link, banner2_link, banner3_link, navigation_banner_1, navigation_link_1, navigation_banner_2, navigation_link_2, navigation_banner_3, navigation_link_3, navigation_banner_4, navigation_link_4, background_image, footer_image, load_logo, footer_logo, theme, ad_banner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [customerId.toString(), '0000000000', website_name, `https://xenonhub.pro/logos/xenonhub.png`, `(⭐) ${website_name} - Digital Store`, `Welcome to ${website_name} - Your trusted digital products store`, 'digital, products, store, gaming', `${website_name} Admin`, null, null, 'https://pic.in.th/image/2000x500.yBFhBc', 'https://pic.in.th/image/2000x500.yBFhBc', 'https://pic.in.th/image/2000x500.yBFhBc', 'https://pic.in.th/image/1000x500.yBFgEA', null, 'https://pic.in.th/image/1000x500.yBFgEA', null, 'https://pic.in.th/image/1000x500.yBFgEA', null, 'https://pic.in.th/image/1000x500.yBFgEA', null, null, null, null, null, 'Dark mode', 'https://pic.in.th/image/1500x1500.yBFPCP']
+            [customerId.toString(), '0000000000', website_name, `https://xenonhub.pro/logos/xenonhub.png`, `(⭐) ${website_name} - Digital Store`, `Welcome to ${website_name} - Your trusted digital products store`, 'digital, products, store, gaming', `${website_name} Admin`, null, null, 'https://img2.pic.in.th/pic/2000x500172fb60914209eb0.png', 'https://img2.pic.in.th/pic/2000x500172fb60914209eb0.png', 'https://img2.pic.in.th/pic/2000x500172fb60914209eb0.png', 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, null, null, null, null, 'Dark mode', 'https://img5.pic.in.th/file/secure-sv1/1500x1500232d3d161739dfd2.png']
           );
           console.log(`Inserted config for customer_id: ${customerId}`);
 
