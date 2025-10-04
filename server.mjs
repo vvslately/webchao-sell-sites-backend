@@ -324,31 +324,28 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
         });
       }
 
-      // Check if website_name already exists in auth_sites
-      const [existingSites] = await connection.execute(
-        'SELECT customer_id, expiredDay FROM auth_sites WHERE website_name = ?',
-        [website_name]
-      );
+      // Check if method is 'new' and website_name already exists
+      if (method === 'new') {
+        const [existingSites] = await connection.execute(
+          'SELECT customer_id FROM auth_sites WHERE website_name = ?',
+          [website_name]
+        );
 
+        if (existingSites.length > 0) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({
+            success: false,
+            message: 'Website name already exists. Please choose a different name or use renew method.'
+          });
+        }
+      }
+
+      // For new sites, get customer_id
       let customerId;
       let expiredDay;
 
-      if (existingSites.length > 0) {
-        // Website exists, use existing customer_id
-        customerId = existingSites[0].customer_id;
-        const existingExpiredDay = new Date(existingSites[0].expiredDay);
-        const today = new Date();
-        
-        // If expired day is in the past, add 30 days from today
-        if (existingExpiredDay < today) {
-          expiredDay = new Date();
-          expiredDay.setDate(expiredDay.getDate() + 30);
-        } else {
-          // Add 30 days from existing expired day
-          expiredDay = new Date(existingExpiredDay);
-          expiredDay.setDate(expiredDay.getDate() + 30);
-        }
-      } else {
+      if (method === 'new') {
         // New website, get next customer_id
         const [maxCustomer] = await connection.execute(
           'SELECT MAX(CAST(customer_id AS UNSIGNED)) as max_id FROM auth_sites'
@@ -371,20 +368,11 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
       // Combine IV and encrypted data
       encryptedPassword = iv.toString('hex') + ':' + encryptedPassword;
 
-      // Insert or update auth_sites
-      if (existingSites.length > 0) {
-        // Update existing site
-        await connection.execute(
-          'UPDATE auth_sites SET admin_user = ?, admin_password = ?, expiredDay = ? WHERE website_name = ?',
-          [admin_user, encryptedPassword, expiredDay.toISOString().split('T')[0], website_name]
-        );
-      } else {
-        // Insert new site
-        await connection.execute(
-          'INSERT INTO auth_sites (customer_id, website_name, admin_user, admin_password, expiredDay) VALUES (?, ?, ?, ?, ?)',
-          [customerId.toString(), website_name, admin_user, encryptedPassword, expiredDay.toISOString().split('T')[0]]
-        );
-      }
+      // Insert new site (only for method = 'new')
+      await connection.execute(
+        'INSERT INTO auth_sites (customer_id, website_name, admin_user, admin_password, expiredDay) VALUES (?, ?, ?, ?, ?)',
+        [customerId.toString(), website_name, admin_user, encryptedPassword, expiredDay.toISOString().split('T')[0]]
+      );
 
       // Deduct money from user balance
       const newBalance = userBalance - sitePrice;
@@ -394,7 +382,7 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
       );
 
       // Record transaction
-      const methodText = method === 'new' ? 'เช่า' : 'ต่ออายุ';
+      const methodText = 'เช่า';
       const formattedUsername = admin_user.includes('@') ? admin_user : `${admin_user}@gmail.com`;
       const transactionDescription = `${website_name};Username: ${formattedUsername};Password: ${admin_password};${methodText}`;
       await connection.execute(
@@ -403,7 +391,6 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
       );
 
       // Insert data into other tables with the same customer_id (only for new sites)
-      if (existingSites.length === 0) {
         try {
           // Insert into categories table
           const [categoryResult] = await connection.execute(
@@ -445,14 +432,14 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
           // Insert sample product
           await connection.execute(
             'INSERT INTO products (customer_id, category_id, title, subtitle, price, reseller_price, stock, duration, image, download_link, isSpecial, featured, isActive, isWarrenty, warrenty_text, primary_color, secondary_color, priority, discount_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [customerId.toString(), categoryId, 'Sample Product', 'This is a sample product for your new site', 10.00, 8.00, 100, '30 days', `https://img5.pic.in.th/file/secure-sv1/1640x500.jpg`, null, 0, 1, 1, 0, null, '#ff0000', '#b3ffc7', 0, 0]
+            [customerId.toString(), categoryId, 'Sample Product', 'This is a sample product for your new site', 10.00, 8.00, 100, '30 days', `https://img2.pic.in.th/pic/1500x1500.jpg`, null, 0, 1, 1, 0, null, '#ff0000', '#b3ffc7', 0, 0]
           );
           console.log(`Inserted sample product for customer_id: ${customerId}`);
 
           // Insert config data
           await connection.execute(
-            'INSERT INTO config (customer_id, owner_phone, site_name, site_logo, meta_title, meta_description, meta_keywords, meta_author, discord_link, discord_webhook, banner_link, banner2_link, banner3_link, background_image, footer_image, load_logo, footer_logo, theme) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [customerId.toString(), '0000000000', website_name, `https://xenonhub.pro/logos/xenonhub.png`, `(⭐) ${website_name} - Digital Store`, `Welcome to ${website_name} - Your trusted digital products store`, 'digital, products, store, gaming', `${website_name} Admin`, null, null, 'https://img2.pic.in.th/pic/2000x5009e8abd4c1b6fc6df.jpg', 'https://img2.pic.in.th/pic/2000x5009e8abd4c1b6fc6df.jpg', 'https://img2.pic.in.th/pic/2000x5009e8abd4c1b6fc6df.jpg', null, null, null, null, 'Dark mode']
+            'INSERT INTO config (customer_id, owner_phone, site_name, site_logo, meta_title, meta_description, meta_keywords, meta_author, discord_link, discord_webhook, banner_link, banner2_link, banner3_link, navigation_banner_1, navigation_link_1, navigation_banner_2, navigation_link_2, navigation_banner_3, navigation_link_3, navigation_banner_4, navigation_link_4, background_image, footer_image, load_logo, footer_logo, theme, ad_banner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [customerId.toString(), '0000000000', website_name, `https://xenonhub.pro/logos/xenonhub.png`, `(⭐) ${website_name} - Digital Store`, `Welcome to ${website_name} - Your trusted digital products store`, 'digital, products, store, gaming', `${website_name} Admin`, null, null, 'https://img2.pic.in.th/pic/2000x5009e8abd4c1b6fc6df.jpg', 'https://img2.pic.in.th/pic/2000x5009e8abd4c1b6fc6df.jpg', 'https://img2.pic.in.th/pic/2000x5009e8abd4c1b6fc6df.jpg', 'https://img5.pic.in.th/file/secure-sv1/1000x500.jpg', null, 'https://img5.pic.in.th/file/secure-sv1/1000x500.jpg', null, 'https://img5.pic.in.th/file/secure-sv1/1000x500.jpg', null, 'https://img5.pic.in.th/file/secure-sv1/1000x500.jpg', null, null, null, null, null, 'Dark mode', 'https://img2.pic.in.th/pic/1500x1500.jpg']
           );
           console.log(`Inserted config for customer_id: ${customerId}`);
 
@@ -463,9 +450,6 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
           // Don't fail the transaction if additional data insertion fails
           // Just log the error and continue
         }
-      } else {
-        console.log(`Site already exists, skipping additional data insertion for customer_id: ${customerId}`);
-      }
 
       // Commit transaction
       await connection.commit();
@@ -493,6 +477,137 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
 
   } catch (error) {
     console.error('Purchase site error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Renew website endpoint
+app.post('/api/resell/renew-site', authenticateToken, async (req, res) => {
+  try {
+    const { website_name } = req.body;
+    const userId = req.user.user_id;
+
+    // Validate required fields
+    if (!website_name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Website name is required'
+      });
+    }
+
+    // Start database transaction
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // Get user balance
+      const [users] = await connection.execute(
+        'SELECT balance FROM resell_users WHERE user_id = ?',
+        [userId]
+      );
+
+      if (users.length === 0) {
+        await connection.rollback();
+        connection.release();
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      const userBalance = parseFloat(users[0].balance);
+      const sitePrice = 200.00; // ราคา site (สามารถปรับได้)
+
+      // Check if user has enough balance
+      if (userBalance < sitePrice) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({
+          success: false,
+          message: 'Insufficient balance',
+          required: sitePrice,
+          current: userBalance
+        });
+      }
+
+      // Check if website exists
+      const [existingSites] = await connection.execute(
+        'SELECT customer_id, expiredDay FROM auth_sites WHERE website_name = ?',
+        [website_name]
+      );
+
+      if (existingSites.length === 0) {
+        await connection.rollback();
+        connection.release();
+        return res.status(404).json({
+          success: false,
+          message: 'Website not found'
+        });
+      }
+
+      // Calculate new expiry date
+      const existingExpiredDay = new Date(existingSites[0].expiredDay);
+      const today = new Date();
+      let newExpiredDay;
+
+      // If expired day is in the past, add 30 days from today
+      if (existingExpiredDay < today) {
+        newExpiredDay = new Date();
+        newExpiredDay.setDate(newExpiredDay.getDate() + 30);
+      } else {
+        // Add 30 days from existing expired day
+        newExpiredDay = new Date(existingExpiredDay);
+        newExpiredDay.setDate(newExpiredDay.getDate() + 30);
+      }
+
+      // Update expired day in auth_sites
+      await connection.execute(
+        'UPDATE auth_sites SET expiredDay = ? WHERE website_name = ?',
+        [newExpiredDay.toISOString().split('T')[0], website_name]
+      );
+
+      // Deduct money from user balance
+      const newBalance = userBalance - sitePrice;
+      await connection.execute(
+        'UPDATE resell_users SET balance = ? WHERE user_id = ?',
+        [newBalance, userId]
+      );
+
+      // Record transaction
+      const transactionDescription = `${website_name};ต่ออายุ`;
+      await connection.execute(
+        'INSERT INTO resell_transactions (user_id, type, amount, description, status) VALUES (?, ?, ?, ?, ?)',
+        [userId, 'purchase', sitePrice, transactionDescription, 'success']
+      );
+
+      // Commit transaction
+      await connection.commit();
+      connection.release();
+
+      res.json({
+        success: true,
+        message: 'Website renewed successfully',
+        data: {
+          website_name,
+          old_expired_day: existingExpiredDay.toISOString().split('T')[0],
+          new_expired_day: newExpiredDay.toISOString().split('T')[0],
+          amount_deducted: sitePrice,
+          remaining_balance: newBalance
+        }
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      throw error;
+    }
+
+  } catch (error) {
+    console.error('Renew site error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -1136,7 +1251,8 @@ app.listen(PORT, () => {
   console.log(`  POST /api/resell/signup - Create new user`);
   console.log(`  POST /api/resell/login - User login`);
   console.log(`  GET /api/resell/myprofile - Get user profile (requires auth)`);
-  console.log(`  POST /api/resell/purchase-site - Purchase site (requires auth)`);
+  console.log(`  POST /api/resell/purchase-site - Purchase new site (requires auth)`);
+  console.log(`  POST /api/resell/renew-site - Renew existing site (requires auth)`);
   console.log(`  GET /api/resell/transactions - Get transaction history (requires auth)`);
   console.log(`  GET /api/resell/topup-history - Get topup history (requires auth)`);
   console.log(`  POST /api/resell/topup - Submit topup request (requires auth)`);
