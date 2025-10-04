@@ -29,7 +29,7 @@ const pool = mysql.createPool(dbConfig);
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000' , 'https://vhouse.space' ,'https://web-rental-frontend.vercel.app'],
+  origin: ['http://localhost:5173', 'http://localhost:3000' , 'https://vhouse.space' ,'https://web-rental-frontend.vercel.app' ,'https://www.vhouse.space'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
