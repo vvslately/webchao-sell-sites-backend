@@ -1,7 +1,7 @@
 import express from 'express';
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
 
@@ -395,17 +395,8 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
 
       // Record transaction
       const methodText = method === 'new' ? 'เช่า' : 'ต่ออายุ';
-      let transactionDescription;
-      
-      if (method === 'new') {
-        // เช่า - แสดงข้อมูลทั้งหมด
-        const formattedUsername = admin_user.includes('@') ? admin_user : `${admin_user}@gmail.com`;
-        transactionDescription = `${website_name};Username: ${formattedUsername};Password: ${admin_password};${methodText}`;
-      } else {
-        // ต่ออายุ - ไม่แสดงข้อมูล Username และ Password
-        transactionDescription = `${website_name};${methodText}`;
-      }
-      
+      const formattedUsername = admin_user.includes('@') ? admin_user : `${admin_user}@gmail.com`;
+      const transactionDescription = `${website_name};Username: ${formattedUsername};Password: ${admin_password};${methodText}`;
       await connection.execute(
         'INSERT INTO resell_transactions (user_id, type, amount, description, status) VALUES (?, ?, ?, ?, ?)',
         [userId, 'purchase', sitePrice, transactionDescription, 'success']
@@ -437,7 +428,6 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
           console.log(`Inserted theme settings for customer_id: ${customerId}`);
 
           // Insert into users table (admin user for the site)
-          const bcrypt = await import('bcrypt');
           const hashedPassword = await bcrypt.hash(admin_password, 10);
           
           // Auto-convert admin to admin@gmail.com if no @ symbol found

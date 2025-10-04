@@ -1,7 +1,8 @@
 {
   "name": "webchao-sell-sites-backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "server.mjs",
+  "type": "module",
   "scripts": {
     "start": "node server.mjs",
     "dev": "node --watch server.mjs",
@@ -11,7 +12,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "bcrypt": "^5.1.1",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
