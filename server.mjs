@@ -29,7 +29,7 @@ const pool = mysql.createPool(dbConfig);
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000'],
+  origin: ['http://localhost:5173', 'http://localhost:3000' , 'https://vhouse.space'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -278,14 +278,14 @@ app.get('/api/resell/myprofile', authenticateToken, async (req, res) => {
 // Purchase site endpoint
 app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
   try {
-    const { website_name, admin_user, admin_password } = req.body;
+    const { website_name, admin_user, admin_password, method } = req.body;
     const userId = req.user.user_id;
 
     // Validate required fields
-    if (!website_name || !admin_user || !admin_password) {
+    if (!website_name || !admin_user || !admin_password || !method) {
       return res.status(400).json({
         success: false,
-        message: 'Website name, admin user, and admin password are required'
+        message: 'Website name, admin user, admin password, and method are required'
       });
     }
 
@@ -394,7 +394,18 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
       );
 
       // Record transaction
-      const transactionDescription = `${website_name};${admin_user}@gmail.com:${admin_password}`;
+      const methodText = method === 'new' ? 'เช่า' : 'ต่ออายุ';
+      let transactionDescription;
+      
+      if (method === 'new') {
+        // เช่า - แสดงข้อมูลทั้งหมด
+        const formattedUsername = admin_user.includes('@') ? admin_user : `${admin_user}@gmail.com`;
+        transactionDescription = `${website_name};Username: ${formattedUsername};Password: ${admin_password};${methodText}`;
+      } else {
+        // ต่ออายุ - ไม่แสดงข้อมูล Username และ Password
+        transactionDescription = `${website_name};${methodText}`;
+      }
+      
       await connection.execute(
         'INSERT INTO resell_transactions (user_id, type, amount, description, status) VALUES (?, ?, ?, ?, ?)',
         [userId, 'purchase', sitePrice, transactionDescription, 'success']
@@ -477,6 +488,7 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
           customer_id: customerId,
           website_name,
           admin_user,
+          method,
           expiredDay: expiredDay.toISOString().split('T')[0],
           amount_deducted: sitePrice,
           remaining_balance: newBalance
