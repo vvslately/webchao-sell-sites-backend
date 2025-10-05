@@ -352,9 +352,9 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
         );
         customerId = (maxCustomer[0].max_id || 0) + 1;
         
-        // Add 30 days from today for new site
+        // Add 31 days from today for new site
         expiredDay = new Date();
-        expiredDay.setDate(expiredDay.getDate() + 30);
+        expiredDay.setDate(expiredDay.getDate() + 31);
       }
 
       // Encrypt admin_password using secret key
