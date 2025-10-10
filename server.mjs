@@ -10,7 +10,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = '91bbc8a7d1dab1b0604d9b91c89f2646';
+const JWT_SECRET = process.env.JWT_SECRET || '91bbc8a7d1dab1b0604d9b91c89f2646';
 
 // Database configuration
 const dbConfig = {
@@ -29,7 +29,7 @@ const pool = mysql.createPool(dbConfig);
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000' , 'https://vhouse.space' ,'https://web-rental-frontend.vercel.app' ,'https://www.vhouse.space'],
+  origin: ['http://localhost:5173', 'http://localhost:3000' , 'https://vhouse.space' ,'https://web-rental-frontend.vercel.app' ,'https://www.vhouse.space' , 'https://wichx-seller-sites-frontend.vercel.app'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -276,7 +276,7 @@ app.get('/api/resell/myprofile', authenticateToken, async (req, res) => {
 });
 
 // Purchase site endpoint
-app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
+app.post('/api/resell/purchase-site/model1', authenticateToken, async (req, res) => {
   try {
     const { website_name, admin_user, admin_password, method } = req.body;
     const userId = req.user.user_id;
@@ -310,7 +310,23 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
       }
 
       const userBalance = parseFloat(users[0].balance);
-      const sitePrice = 200.00; // ราคา site (สามารถปรับได้)
+      
+      // Get config data for pricing and banners
+      const [configs] = await connection.execute(
+        'SELECT Model1_price, Model1_1500x1500Banner, Model1_2000x500Banner, Model1_1000x500Banner, Model1_1640x500Banner FROM resell_config ORDER BY id ASC LIMIT 1'
+      );
+      
+      if (configs.length === 0) {
+        await connection.rollback();
+        connection.release();
+        return res.status(500).json({
+          success: false,
+          message: 'Config not found'
+        });
+      }
+      
+      const config = configs[0];
+      const sitePrice = parseFloat(config.Model1_price);
 
       // Check if user has enough balance
       if (userBalance < sitePrice) {
@@ -395,7 +411,7 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
           // Insert into categories table
           const [categoryResult] = await connection.execute(
             'INSERT INTO categories (customer_id, title, subtitle, image, category, featured, isActive, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [customerId.toString(), `${website_name} Category`, `Category for ${website_name}`, `https://img2.pic.in.th/pic/1640x500ebe7d18bc84a1cf6.png`, `${website_name.toLowerCase()}_category`, 0, 1, 0]
+            [customerId.toString(), `${website_name} Category`, `Category for ${website_name}`, config.Model1_1640x500Banner || `https://img2.pic.in.th/pic/1640x500ebe7d18bc84a1cf6.png`, `${website_name.toLowerCase()}_category`, 0, 1, 0]
           );
           const categoryId = categoryResult.insertId;
           console.log(`Inserted category for customer_id: ${customerId}`);
@@ -432,14 +448,14 @@ app.post('/api/resell/purchase-site', authenticateToken, async (req, res) => {
           // Insert sample product
           await connection.execute(
             'INSERT INTO products (customer_id, category_id, title, subtitle, price, reseller_price, stock, duration, image, download_link, isSpecial, featured, isActive, isWarrenty, warrenty_text, primary_color, secondary_color, priority, discount_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [customerId.toString(), categoryId, 'Sample Product', 'This is a sample product for your new site', 10.00, 8.00, 100, '30 days', `https://img5.pic.in.th/file/secure-sv1/1500x1500232d3d161739dfd2.png`, null, 0, 1, 1, 0, null, '#ff0000', '#b3ffc7', 0, 0]
+            [customerId.toString(), categoryId, 'Sample Product', 'This is a sample product for your new site', 10.00, 8.00, 100, '30 days', config.Model1_1500x1500Banner || `https://img5.pic.in.th/file/secure-sv1/1500x1500232d3d161739dfd2.png`, null, 0, 1, 1, 0, null, '#ff0000', '#b3ffc7', 0, 0]
           );
           console.log(`Inserted sample product for customer_id: ${customerId}`);
 
           // Insert config data
           await connection.execute(
             'INSERT INTO config (customer_id, owner_phone, site_name, site_logo, meta_title, meta_description, meta_keywords, meta_author, discord_link, discord_webhook, banner_link, banner2_link, banner3_link, navigation_banner_1, navigation_link_1, navigation_banner_2, navigation_link_2, navigation_banner_3, navigation_link_3, navigation_banner_4, navigation_link_4, background_image, footer_image, load_logo, footer_logo, theme, ad_banner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [customerId.toString(), '0000000000', website_name, `https://img5.pic.in.th/file/secure-sv1/1500x1500232d3d161739dfd2.png`, `(⭐) ${website_name} - Digital Store`, `Welcome to ${website_name} - Your trusted digital products store`, 'digital, products, store, gaming', `${website_name} Admin`, null, null, 'https://img2.pic.in.th/pic/2000x500172fb60914209eb0.png', 'https://img2.pic.in.th/pic/2000x500172fb60914209eb0.png', 'https://img2.pic.in.th/pic/2000x500172fb60914209eb0.png', 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, null, null, null, null, 'Dark mode', 'https://img5.pic.in.th/file/secure-sv1/1500x1500232d3d161739dfd2.png']
+            [customerId.toString(), '0000000000', website_name, config.Model1_1500x1500Banner || `https://img5.pic.in.th/file/secure-sv1/1500x1500232d3d161739dfd2.png`, `(⭐) ${website_name} - Digital Store`, `Welcome to ${website_name} - Your trusted digital products store`, 'digital, products, store, gaming', `${website_name} Admin`, null, null, config.Model1_2000x500Banner || 'https://img2.pic.in.th/pic/2000x500172fb60914209eb0.png', config.Model1_2000x500Banner || 'https://img2.pic.in.th/pic/2000x500172fb60914209eb0.png', config.Model1_2000x500Banner || 'https://img2.pic.in.th/pic/2000x500172fb60914209eb0.png', config.Model1_1000x500Banner || 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, config.Model1_1000x500Banner || 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, config.Model1_1000x500Banner || 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, config.Model1_1000x500Banner || 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, null, null, null, null, 'Dark mode', config.Model1_1500x1500Banner || 'https://img5.pic.in.th/file/secure-sv1/1500x1500232d3d161739dfd2.png']
           );
           console.log(`Inserted config for customer_id: ${customerId}`);
 
@@ -520,7 +536,23 @@ app.post('/api/resell/renew-site', authenticateToken, async (req, res) => {
       }
 
       const userBalance = parseFloat(users[0].balance);
-      const sitePrice = 200.00; // ราคา site (สามารถปรับได้)
+      
+      // Get config data for resell pricing
+      const [configs] = await connection.execute(
+        'SELECT Model1_resell_price FROM resell_config ORDER BY id ASC LIMIT 1'
+      );
+      
+      if (configs.length === 0) {
+        await connection.rollback();
+        connection.release();
+        return res.status(500).json({
+          success: false,
+          message: 'Config not found'
+        });
+      }
+      
+      const config = configs[0];
+      const sitePrice = parseFloat(config.Model1_resell_price);
 
       // Check if user has enough balance
       if (userBalance < sitePrice) {
@@ -1080,19 +1112,1162 @@ app.post('/api/resell/redeem-angpao', authenticateToken, async (req, res) => {
   }
 });
 
+// ==================== RESELL CONFIG API ====================
+
+// Get resell config (first row only) - Public endpoint
+app.get('/api/resell/config', async (req, res) => {
+  try {
+    const [configs] = await pool.execute(
+      'SELECT * FROM resell_config ORDER BY id ASC LIMIT 1'
+    );
+
+    if (configs.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No config found'
+      });
+    }
+
+    const config = configs[0];
+
+    res.json({
+      success: true,
+      message: 'Config retrieved successfully',
+      data: {
+        // Public information for general users
+        owner_name: config.owner_name,
+        owner_bank: config.owner_bank,
+        website_name: config.website_name,
+        Model1_price: config.Model1_price,
+        Model1_resell_price: config.Model1_resell_price,
+        Model1_name: config.Model1_name,
+        // Banner URLs for public use
+        Model1_1500x1500Banner: config.Model1_1500x1500Banner,
+        Model1_2000x500Banner: config.Model1_2000x500Banner,
+        Model1_1000x500Banner: config.Model1_1000x500Banner,
+        Model1_1640x500Banner: config.Model1_1640x500Banner,
+        // Private information (only for internal use)
+        phone_number: config.phone_number
+      }
+    });
+
+  } catch (error) {
+    console.error('Get resell config error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Get all resell configs (Admin only)
+app.get('/api/resell/admin/configs', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    const [configs] = await pool.execute(
+      'SELECT * FROM resell_config ORDER BY id ASC'
+    );
+
+    res.json({
+      success: true,
+      message: 'Configs retrieved successfully',
+      data: configs
+    });
+
+  } catch (error) {
+    console.error('Get resell configs error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Create new resell config (Admin only)
+app.post('/api/resell/admin/config', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const {
+      phone_number,
+      owner_name,
+      owner_bank,
+      website_name,
+      Model1_price,
+      Model1_resell_price,
+      Model1_name,
+      Model1_1500x1500Banner,
+      Model1_2000x500Banner,
+      Model1_1000x500Banner,
+      Model1_1640x500Banner
+    } = req.body;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    // Validate required fields
+    if (!phone_number || !owner_name || !owner_bank || !website_name || 
+        !Model1_price || !Model1_resell_price || !Model1_name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Required fields: phone_number, owner_name, owner_bank, website_name, Model1_price, Model1_resell_price, Model1_name'
+      });
+    }
+
+    // Insert new config
+    const [result] = await pool.execute(
+      'INSERT INTO resell_config (phone_number, owner_name, owner_bank, website_name, Model1_price, Model1_resell_price, Model1_name, Model1_1500x1500Banner, Model1_2000x500Banner, Model1_1000x500Banner, Model1_1640x500Banner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [phone_number, owner_name, owner_bank, website_name, Model1_price, Model1_resell_price, Model1_name, Model1_1500x1500Banner, Model1_2000x500Banner, Model1_1000x500Banner, Model1_1640x500Banner]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Config created successfully',
+      data: {
+        id: result.insertId,
+        phone_number,
+        owner_name,
+        owner_bank,
+        website_name,
+        Model1_price,
+        Model1_resell_price,
+        Model1_name,
+        Model1_1500x1500Banner,
+        Model1_2000x500Banner,
+        Model1_1000x500Banner,
+        Model1_1640x500Banner
+      }
+    });
+
+  } catch (error) {
+    console.error('Create resell config error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Update resell config (Admin only)
+app.put('/api/resell/admin/config/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.user_id;
+    const {
+      phone_number,
+      owner_name,
+      owner_bank,
+      website_name,
+      Model1_price,
+      Model1_resell_price,
+      Model1_name,
+      Model1_1500x1500Banner,
+      Model1_2000x500Banner,
+      Model1_1000x500Banner,
+      Model1_1640x500Banner
+    } = req.body;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    // Check if config exists
+    const [existingConfig] = await pool.execute(
+      'SELECT id FROM resell_config WHERE id = ?',
+      [id]
+    );
+
+    if (existingConfig.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Config not found'
+      });
+    }
+
+    // Build update query dynamically
+    const updateFields = [];
+    const updateValues = [];
+
+    if (phone_number !== undefined) {
+      updateFields.push('phone_number = ?');
+      updateValues.push(phone_number);
+    }
+    if (owner_name !== undefined) {
+      updateFields.push('owner_name = ?');
+      updateValues.push(owner_name);
+    }
+    if (owner_bank !== undefined) {
+      updateFields.push('owner_bank = ?');
+      updateValues.push(owner_bank);
+    }
+    if (website_name !== undefined) {
+      updateFields.push('website_name = ?');
+      updateValues.push(website_name);
+    }
+    if (Model1_price !== undefined) {
+      updateFields.push('Model1_price = ?');
+      updateValues.push(Model1_price);
+    }
+    if (Model1_resell_price !== undefined) {
+      updateFields.push('Model1_resell_price = ?');
+      updateValues.push(Model1_resell_price);
+    }
+    if (Model1_name !== undefined) {
+      updateFields.push('Model1_name = ?');
+      updateValues.push(Model1_name);
+    }
+    if (Model1_1500x1500Banner !== undefined) {
+      updateFields.push('Model1_1500x1500Banner = ?');
+      updateValues.push(Model1_1500x1500Banner);
+    }
+    if (Model1_2000x500Banner !== undefined) {
+      updateFields.push('Model1_2000x500Banner = ?');
+      updateValues.push(Model1_2000x500Banner);
+    }
+    if (Model1_1000x500Banner !== undefined) {
+      updateFields.push('Model1_1000x500Banner = ?');
+      updateValues.push(Model1_1000x500Banner);
+    }
+    if (Model1_1640x500Banner !== undefined) {
+      updateFields.push('Model1_1640x500Banner = ?');
+      updateValues.push(Model1_1640x500Banner);
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No fields to update'
+      });
+    }
+
+    updateValues.push(id);
+
+    // Update config
+    await pool.execute(
+      `UPDATE resell_config SET ${updateFields.join(', ')} WHERE id = ?`,
+      updateValues
+    );
+
+    res.json({
+      success: true,
+      message: 'Config updated successfully',
+      data: {
+        id: parseInt(id),
+        updated_fields: updateFields.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Update resell config error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Delete resell config (Admin only)
+app.delete('/api/resell/admin/config/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.user_id;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    // Check if config exists
+    const [existingConfig] = await pool.execute(
+      'SELECT id FROM resell_config WHERE id = ?',
+      [id]
+    );
+
+    if (existingConfig.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Config not found'
+      });
+    }
+
+    // Delete config
+    await pool.execute(
+      'DELETE FROM resell_config WHERE id = ?',
+      [id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Config deleted successfully',
+      data: {
+        id: parseInt(id)
+      }
+    });
+
+  } catch (error) {
+    console.error('Delete resell config error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// ==================== RESELL USERS MANAGEMENT API ====================
+
+// Get all resell users (Admin only)
+app.get('/api/resell/admin/users', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    const [allUsers] = await pool.execute(
+      'SELECT user_id, username, email, role, balance, created_at FROM resell_users ORDER BY created_at DESC'
+    );
+
+    res.json({
+      success: true,
+      message: 'Users retrieved successfully',
+      data: allUsers
+    });
+
+  } catch (error) {
+    console.error('Get resell users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Get specific user details (Admin only)
+app.get('/api/resell/admin/users/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.user_id;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    const [targetUsers] = await pool.execute(
+      'SELECT user_id, username, email, role, balance, created_at FROM resell_users WHERE user_id = ?',
+      [id]
+    );
+
+    if (targetUsers.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Get user's transaction history
+    const [transactions] = await pool.execute(
+      'SELECT transac_id, type, amount, description, status, created_at FROM resell_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT 10',
+      [id]
+    );
+
+    // Get user's topup history
+    const [topups] = await pool.execute(
+      'SELECT topup_id, method, amount, slip_url, status, created_at FROM resell_topup_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 10',
+      [id]
+    );
+
+    res.json({
+      success: true,
+      message: 'User details retrieved successfully',
+      data: {
+        user: targetUsers[0],
+        recent_transactions: transactions,
+        recent_topups: topups
+      }
+    });
+
+  } catch (error) {
+    console.error('Get user details error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Update user information (Admin only) 
+app.put('/api/resell/admin/users/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.user_id;
+    const { username, email, role, balance } = req.body;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    // Check if target user exists
+    const [targetUsers] = await pool.execute(
+      'SELECT user_id FROM resell_users WHERE user_id = ?',
+      [id]
+    );
+
+    if (targetUsers.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Build update query dynamically
+    const updateFields = [];
+    const updateValues = [];
+
+    if (username !== undefined) {
+      // Check if username already exists (excluding current user)
+      const [existingUsername] = await pool.execute(
+        'SELECT user_id FROM resell_users WHERE username = ? AND user_id != ?',
+        [username, id]
+      );
+      if (existingUsername.length > 0) {
+        return res.status(409).json({
+          success: false,
+          message: 'Username already exists'
+        });
+      }
+      updateFields.push('username = ?');
+      updateValues.push(username);
+    }
+
+    if (email !== undefined) {
+      // Check if email already exists (excluding current user)
+      const [existingEmail] = await pool.execute(
+        'SELECT user_id FROM resell_users WHERE email = ? AND user_id != ?',
+        [email, id]
+      );
+      if (existingEmail.length > 0) {
+        return res.status(409).json({
+          success: false,
+          message: 'Email already exists'
+        });
+      }
+      updateFields.push('email = ?');
+      updateValues.push(email);
+    }
+
+    if (role !== undefined) {
+      const validRoles = ['admin', 'user', 'moderator'];
+      if (!validRoles.includes(role)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid role. Must be one of: admin, user, moderator'
+        });
+      }
+      updateFields.push('role = ?');
+      updateValues.push(role);
+    }
+
+    if (balance !== undefined) {
+      const balanceValue = parseFloat(balance);
+      if (isNaN(balanceValue) || balanceValue < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Balance must be a positive number'
+        });
+      }
+      updateFields.push('balance = ?');
+      updateValues.push(balanceValue);
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No fields to update'
+      });
+    }
+
+    updateValues.push(id);
+
+    // Update user
+    await pool.execute(
+      `UPDATE resell_users SET ${updateFields.join(', ')} WHERE user_id = ?`,
+      updateValues
+    );
+
+    res.json({
+      success: true,
+      message: 'User updated successfully',
+      data: {
+        user_id: parseInt(id),
+        updated_fields: updateFields.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Add balance to user (Admin only)
+app.post('/api/resell/admin/users/:id/add-balance', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.user_id;
+    const { amount, description } = req.body;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    // Validate amount
+    const addAmount = parseFloat(amount);
+    if (isNaN(addAmount) || addAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Amount must be a positive number'
+      });
+    }
+
+    // Check if target user exists
+    const [targetUsers] = await pool.execute(
+      'SELECT user_id, balance FROM resell_users WHERE user_id = ?',
+      [id]
+    );
+
+    if (targetUsers.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const targetUser = targetUsers[0];
+    const newBalance = parseFloat(targetUser.balance) + addAmount;
+
+    // Start transaction
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // Update user balance
+      await connection.execute(
+        'UPDATE resell_users SET balance = ? WHERE user_id = ?',
+        [newBalance, id]
+      );
+
+      // Record transaction
+      const transactionDescription = description || `Admin added balance: +${addAmount}`;
+      await connection.execute(
+        'INSERT INTO resell_transactions (user_id, type, amount, description, status) VALUES (?, ?, ?, ?, ?)',
+        [id, 'purchase', addAmount, transactionDescription, 'success']
+      );
+
+      await connection.commit();
+      connection.release();
+
+      res.json({
+        success: true,
+        message: 'Balance added successfully',
+        data: {
+          user_id: parseInt(id),
+          amount_added: addAmount,
+          old_balance: parseFloat(targetUser.balance),
+          new_balance: newBalance
+        }
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      throw error;
+    }
+
+  } catch (error) {
+    console.error('Add balance error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Delete user (Admin only)
+app.delete('/api/resell/admin/users/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.user_id;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    // Prevent admin from deleting themselves
+    if (parseInt(id) === userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete your own account'
+      });
+    }
+
+    // Check if target user exists
+    const [targetUsers] = await pool.execute(
+      'SELECT user_id, username FROM resell_users WHERE user_id = ?',
+      [id]
+    );
+
+    if (targetUsers.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const targetUser = targetUsers[0];
+
+    // Delete user (CASCADE will handle related records)
+    await pool.execute(
+      'DELETE FROM resell_users WHERE user_id = ?',
+      [id]
+    );
+
+    res.json({
+      success: true,
+      message: 'User deleted successfully',
+      data: {
+        user_id: parseInt(id),
+        username: targetUser.username
+      }
+    });
+
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// ==================== REPORTS API ====================
+
+// Get all topup history (Admin only)
+app.get('/api/resell/admin/reports/topups', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    const [topups] = await pool.execute(
+      `SELECT 
+        t.topup_id,
+        t.user_id,
+        u.username,
+        u.email,
+        t.method,
+        t.amount,
+        t.slip_url,
+        t.status,
+        t.created_at
+      FROM resell_topup_history t
+      LEFT JOIN resell_users u ON t.user_id = u.user_id
+      ORDER BY t.created_at DESC`
+    );
+
+    res.json({
+      success: true,
+      message: 'Topup history retrieved successfully',
+      data: topups
+    });
+
+  } catch (error) {
+    console.error('Get topup reports error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Get all transactions (Admin only)
+app.get('/api/resell/admin/reports/transactions', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    const [transactions] = await pool.execute(
+      `SELECT 
+        t.transac_id,
+        t.user_id,
+        u.username,
+        u.email,
+        t.type,
+        t.amount,
+        t.description,
+        t.status,
+        t.created_at
+      FROM resell_transactions t
+      LEFT JOIN resell_users u ON t.user_id = u.user_id
+      ORDER BY t.created_at DESC`
+    );
+
+    res.json({
+      success: true,
+      message: 'Transaction history retrieved successfully',
+      data: transactions
+    });
+
+  } catch (error) {
+    console.error('Get transaction reports error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Get sales summary (Admin only)
+app.get('/api/resell/admin/reports/summary', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    // Get total topup amounts by status
+    const [topupSummary] = await pool.execute(
+      `SELECT 
+        status,
+        COUNT(*) as count,
+        SUM(amount) as total_amount
+      FROM resell_topup_history 
+      GROUP BY status`
+    );
+
+    // Get total transaction amounts by type and status
+    const [transactionSummary] = await pool.execute(
+      `SELECT 
+        type,
+        status,
+        COUNT(*) as count,
+        SUM(amount) as total_amount
+      FROM resell_transactions 
+      GROUP BY type, status`
+    );
+
+    // Get daily sales for last 30 days
+    const [dailySales] = await pool.execute(
+      `SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as transaction_count,
+        SUM(amount) as total_amount
+      FROM resell_transactions 
+      WHERE type = 'purchase' AND status = 'success'
+      AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+      GROUP BY DATE(created_at)
+      ORDER BY date DESC`
+    );
+
+    // Get monthly sales for last 12 months
+    const [monthlySales] = await pool.execute(
+      `SELECT 
+        DATE_FORMAT(created_at, '%Y-%m') as month,
+        COUNT(*) as transaction_count,
+        SUM(amount) as total_amount
+      FROM resell_transactions 
+      WHERE type = 'purchase' AND status = 'success'
+      AND created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+      GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+      ORDER BY month DESC`
+    );
+
+    // Get top users by spending
+    const [topUsers] = await pool.execute(
+      `SELECT 
+        u.user_id,
+        u.username,
+        u.email,
+        COUNT(t.transac_id) as transaction_count,
+        SUM(t.amount) as total_spent
+      FROM resell_users u
+      LEFT JOIN resell_transactions t ON u.user_id = t.user_id AND t.type = 'purchase' AND t.status = 'success'
+      GROUP BY u.user_id, u.username, u.email
+      HAVING total_spent > 0
+      ORDER BY total_spent DESC
+      LIMIT 10`
+    );
+
+    // Calculate totals
+    const totalTopupAmount = topupSummary.reduce((sum, item) => sum + parseFloat(item.total_amount || 0), 0);
+    const totalTransactionAmount = transactionSummary.reduce((sum, item) => sum + parseFloat(item.total_amount || 0), 0);
+    const totalSalesAmount = transactionSummary
+      .filter(item => item.type === 'purchase' && item.status === 'success')
+      .reduce((sum, item) => sum + parseFloat(item.total_amount || 0), 0);
+
+    res.json({
+      success: true,
+      message: 'Sales summary retrieved successfully',
+      data: {
+        summary: {
+          total_topup_amount: totalTopupAmount,
+          total_transaction_amount: totalTransactionAmount,
+          total_sales_amount: totalSalesAmount,
+          total_users: topUsers.length
+        },
+        topup_summary: topupSummary,
+        transaction_summary: transactionSummary,
+        daily_sales: dailySales,
+        monthly_sales: monthlySales,
+        top_users: topUsers
+      }
+    });
+
+  } catch (error) {
+    console.error('Get sales summary error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Get topup history with filters (Admin only)
+app.get('/api/resell/admin/reports/topups/filtered', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { status, method, start_date, end_date, user_id } = req.query;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    // Build query with filters
+    let query = `
+      SELECT 
+        t.topup_id,
+        t.user_id,
+        u.username,
+        u.email,
+        t.method,
+        t.amount,
+        t.slip_url,
+        t.status,
+        t.created_at
+      FROM resell_topup_history t
+      LEFT JOIN resell_users u ON t.user_id = u.user_id
+      WHERE 1=1
+    `;
+    
+    const queryParams = [];
+
+    if (status) {
+      query += ' AND t.status = ?';
+      queryParams.push(status);
+    }
+
+    if (method) {
+      query += ' AND t.method = ?';
+      queryParams.push(method);
+    }
+
+    if (user_id) {
+      query += ' AND t.user_id = ?';
+      queryParams.push(user_id);
+    }
+
+    if (start_date) {
+      query += ' AND DATE(t.created_at) >= ?';
+      queryParams.push(start_date);
+    }
+
+    if (end_date) {
+      query += ' AND DATE(t.created_at) <= ?';
+      queryParams.push(end_date);
+    }
+
+    query += ' ORDER BY t.created_at DESC';
+
+    const [topups] = await pool.execute(query, queryParams);
+
+    res.json({
+      success: true,
+      message: 'Filtered topup history retrieved successfully',
+      data: topups
+    });
+
+  } catch (error) {
+    console.error('Get filtered topup reports error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Get transactions with filters (Admin only)
+app.get('/api/resell/admin/reports/transactions/filtered', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { type, status, start_date, end_date, user_id } = req.query;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    // Build query with filters
+    let query = `
+      SELECT 
+        t.transac_id,
+        t.user_id,
+        u.username,
+        u.email,
+        t.type,
+        t.amount,
+        t.description,
+        t.status,
+        t.created_at
+      FROM resell_transactions t
+      LEFT JOIN resell_users u ON t.user_id = u.user_id
+      WHERE 1=1
+    `;
+    
+    const queryParams = [];
+
+    if (type) {
+      query += ' AND t.type = ?';
+      queryParams.push(type);
+    }
+
+    if (status) {
+      query += ' AND t.status = ?';
+      queryParams.push(status);
+    }
+
+    if (user_id) {
+      query += ' AND t.user_id = ?';
+      queryParams.push(user_id);
+    }
+
+    if (start_date) {
+      query += ' AND DATE(t.created_at) >= ?';
+      queryParams.push(start_date);
+    }
+
+    if (end_date) {
+      query += ' AND DATE(t.created_at) <= ?';
+      queryParams.push(end_date);
+    }
+
+    query += ' ORDER BY t.created_at DESC';
+
+    const [transactions] = await pool.execute(query, queryParams);
+
+    res.json({
+      success: true,
+      message: 'Filtered transaction history retrieved successfully',
+      data: transactions
+    });
+
+  } catch (error) {
+    console.error('Get filtered transaction reports error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
 // ==================== AUTH SITES API ====================
 
-// Get all auth sites
-app.get('/api/auth-sites', async (req, res) => {
+// Get all auth sites (Admin only)
+app.get('/api/auth-sites', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.user_id;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
     const [sites] = await pool.execute(
-      'SELECT id, customer_id, website_name, admin_user, expiredDay, created_at FROM auth_sites'
+      'SELECT id, customer_id, website_name, admin_user, admin_password, expiredDay, created_at FROM auth_sites ORDER BY created_at DESC'
+    );
+
+    // Decrypt passwords for admin view
+    const sitesWithDecryptedPasswords = await Promise.all(
+      sites.map(async (site) => ({
+        ...site,
+        admin_password: await decryptPassword(site.admin_password)
+      }))
     );
 
     res.json({
       success: true,
       message: 'Auth sites retrieved successfully',
-      data: sites
+      data: sitesWithDecryptedPasswords
     });
 
   } catch (error) {
@@ -1205,6 +2380,263 @@ app.post('/api/auth-sites', async (req, res) => {
   }
 });
 
+// Delete auth site (Admin only)
+app.delete('/api/auth-sites/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.user_id;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    // Check if site exists
+    const [existingSite] = await pool.execute(
+      'SELECT id, customer_id, website_name FROM auth_sites WHERE id = ?',
+      [id]
+    );
+
+    if (existingSite.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Auth site not found'
+      });
+    }
+
+    const site = existingSite[0];
+    const customerId = site.customer_id;
+
+    // Start database transaction
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // Delete all related data for this customer_id
+      // Order matters: delete child tables first, then parent tables
+      
+      // 1. Delete from products first (has foreign key to categories)
+      await connection.execute(
+        'DELETE FROM products WHERE customer_id = ?',
+        [customerId]
+      );
+
+      // 2. Delete from categories (has foreign key to customer_id)
+      await connection.execute(
+        'DELETE FROM categories WHERE customer_id = ?',
+        [customerId]
+      );
+
+      // 3. Delete from users (has foreign key to customer_id)
+      await connection.execute(
+        'DELETE FROM users WHERE customer_id = ?',
+        [customerId]
+      );
+
+      // 4. Delete from roles (has foreign key to customer_id)
+      await connection.execute(
+        'DELETE FROM roles WHERE customer_id = ?',
+        [customerId]
+      );
+
+      // 5. Delete from theme_settings (has foreign key to customer_id)
+      await connection.execute(
+        'DELETE FROM theme_settings WHERE customer_id = ?',
+        [customerId]
+      );
+
+      // 6. Delete from config (has foreign key to customer_id)
+      await connection.execute(
+        'DELETE FROM config WHERE customer_id = ?',
+        [customerId]
+      );
+
+      // 7. Finally delete from auth_sites (parent table)
+      await connection.execute(
+        'DELETE FROM auth_sites WHERE customer_id = ?',
+        [customerId]
+      );
+
+      // Commit transaction
+      await connection.commit();
+      connection.release();
+
+      res.json({
+        success: true,
+        message: 'Auth site and all related data deleted successfully',
+        data: {
+          id: parseInt(id),
+          customer_id: customerId,
+          website_name: site.website_name,
+          deleted_tables: [
+            'products',
+            'categories', 
+            'users',
+            'roles',
+            'theme_settings',
+            'config',
+            'auth_sites'
+          ]
+        }
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      console.error('Foreign key constraint error:', error);
+      throw error;
+    }
+
+  } catch (error) {
+    console.error('Delete auth site error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Disable auth site by setting expiredDay to 100 days ago (Admin only)
+app.put('/api/auth-sites/:id/disable', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.user_id;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    // Check if site exists
+    const [existingSite] = await pool.execute(
+      'SELECT id, customer_id, website_name, expiredDay FROM auth_sites WHERE id = ?',
+      [id]
+    );
+
+    if (existingSite.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Auth site not found'
+      });
+    }
+
+    const site = existingSite[0];
+
+    // Calculate date 100 days ago
+    const disabledDate = new Date();
+    disabledDate.setDate(disabledDate.getDate() - 100);
+
+    // Update expiredDay to 100 days ago
+    await pool.execute(
+      'UPDATE auth_sites SET expiredDay = ? WHERE id = ?',
+      [disabledDate.toISOString().split('T')[0], id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Auth site disabled successfully',
+      data: {
+        id: parseInt(id),
+        customer_id: site.customer_id,
+        website_name: site.website_name,
+        old_expired_day: site.expiredDay,
+        new_expired_day: disabledDate.toISOString().split('T')[0]
+      }
+    });
+
+  } catch (error) {
+    console.error('Disable auth site error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Enable auth site by setting expiredDay to 30 days from now (Admin only)
+app.put('/api/auth-sites/:id/enable', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.user_id;
+
+    // Check if user is admin
+    const [users] = await pool.execute(
+      'SELECT role FROM resell_users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0 || users[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    // Check if site exists
+    const [existingSite] = await pool.execute(
+      'SELECT id, customer_id, website_name, expiredDay FROM auth_sites WHERE id = ?',
+      [id]
+    );
+
+    if (existingSite.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Auth site not found'
+      });
+    }
+
+    const site = existingSite[0];
+
+    // Calculate date 30 days from now
+    const enabledDate = new Date();
+    enabledDate.setDate(enabledDate.getDate() + 30);
+
+    // Update expiredDay to 30 days from now
+    await pool.execute(
+      'UPDATE auth_sites SET expiredDay = ? WHERE id = ?',
+      [enabledDate.toISOString().split('T')[0], id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Auth site enabled successfully',
+      data: {
+        id: parseInt(id),
+        customer_id: site.customer_id,
+        website_name: site.website_name,
+        old_expired_day: site.expiredDay,
+        new_expired_day: enabledDate.toISOString().split('T')[0]
+      }
+    });
+
+  } catch (error) {
+    console.error('Enable auth site error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
 // Test database connection endpoint
 app.get('/test-db', async (req, res) => {
   try {
@@ -1241,6 +2673,8 @@ app.get('/health', (req, res) => {
   });
 });
 
+
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
@@ -1251,15 +2685,36 @@ app.listen(PORT, () => {
   console.log(`  POST /api/resell/signup - Create new user`);
   console.log(`  POST /api/resell/login - User login`);
   console.log(`  GET /api/resell/myprofile - Get user profile (requires auth)`);
-  console.log(`  POST /api/resell/purchase-site - Purchase new site (requires auth)`);
+  console.log(`  POST /api/resell/purchase-site/model1 - Purchase new site (requires auth)`);
   console.log(`  POST /api/resell/renew-site - Renew existing site (requires auth)`);
   console.log(`  GET /api/resell/transactions - Get transaction history (requires auth)`);
   console.log(`  GET /api/resell/topup-history - Get topup history (requires auth)`);
   console.log(`  POST /api/resell/topup - Submit topup request (requires auth)`);
+  console.log(`  GET /api/resell/config - Get resell configuration`);
+  console.log('Resell Config Management (Admin only):');
+  console.log(`  GET /api/resell/admin/configs - Get all configs`);
+  console.log(`  POST /api/resell/admin/config - Create new config`);
+  console.log(`  PUT /api/resell/admin/config/:id - Update config`);
+  console.log(`  DELETE /api/resell/admin/config/:id - Delete config`);
+  console.log('Resell Users Management (Admin only):');
+  console.log(`  GET /api/resell/admin/users - Get all users`);
+  console.log(`  GET /api/resell/admin/users/:id - Get user details`);
+  console.log(`  PUT /api/resell/admin/users/:id - Update user`);
+  console.log(`  POST /api/resell/admin/users/:id/add-balance - Add balance to user`);
+  console.log(`  DELETE /api/resell/admin/users/:id - Delete user`);
+  console.log('Reports (Admin only):');
+  console.log(`  GET /api/resell/admin/reports/topups - Get all topup history`);
+  console.log(`  GET /api/resell/admin/reports/transactions - Get all transactions`);
+  console.log(`  GET /api/resell/admin/reports/summary - Get sales summary`);
+  console.log(`  GET /api/resell/admin/reports/topups/filtered - Get filtered topup history`);
+  console.log(`  GET /api/resell/admin/reports/transactions/filtered - Get filtered transactions`);
   console.log('Auth Sites:');
-  console.log(`  GET /api/auth-sites - Get all auth sites`);
+  console.log(`  GET /api/auth-sites - Get all auth sites (Admin only)`);
   console.log(`  GET /api/auth-sites/:customer_id - Get auth site by customer_id`);
   console.log(`  POST /api/auth-sites - Create new auth site`);
+  console.log(`  DELETE /api/auth-sites/:id - Delete auth site (Admin only)`);
+  console.log(`  PUT /api/auth-sites/:id/disable - Disable auth site (Admin only)`);
+  console.log(`  PUT /api/auth-sites/:id/enable - Enable auth site (Admin only)`);
 });
 
 // Graceful shutdown
