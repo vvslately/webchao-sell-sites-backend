@@ -9,7 +9,7 @@ import cors from 'cors';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3003;
 const JWT_SECRET = process.env.JWT_SECRET || '91bbc8a7d1dab1b0604d9b91c89f2646';
 
 // Database configuration
