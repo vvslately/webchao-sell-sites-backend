@@ -14,11 +14,11 @@ const JWT_SECRET = process.env.JWT_SECRET || '91bbc8a7d1dab1b0604d9b91c89f2646';
 
 // Database configuration
 const dbConfig = {
-  host: 'gondola.proxy.rlwy.net',
-  port: 11555,
-  user: 'root',
-  password: 'tzspZOlqqEvABEgEeCCbDbAFdkGiQSYQ',
-  database: 'railway',
+  host: '210.246.215.19',
+  port: 3306,
+  user: 'vhouseuser',
+  password: 'StrongPass123!',
+  database: 'vhousespace',
   ssl: {
     rejectUnauthorized: false
   }
@@ -29,7 +29,7 @@ const pool = mysql.createPool(dbConfig);
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000' , 'https://vhouse.space' ,'https://web-rental-frontend.vercel.app' ,'https://www.vhouse.space' , 'https://wichx-seller-sites-frontend.vercel.app'],
+  origin: ['http://localhost:5173', 'http://localhost:3000', 'https://vhouse.space', 'https://web-rental-frontend.vercel.app', 'https://www.vhouse.space', 'https://wichx-seller-sites-frontend.vercel.app'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -42,18 +42,18 @@ const decryptPassword = async (encryptedPassword) => {
     if (!encryptedPassword || !encryptedPassword.includes(':')) {
       return encryptedPassword; // Return as is if not encrypted
     }
-    
+
     const crypto = await import('crypto');
     const algorithm = 'aes-256-cbc';
     const key = crypto.scryptSync(JWT_SECRET, 'salt', 32);
-    
+
     const [ivHex, encryptedData] = encryptedPassword.split(':');
     const iv = Buffer.from(ivHex, 'hex');
     const decipher = crypto.createDecipheriv(algorithm, key, iv);
-    
+
     let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
-    
+
     return decrypted;
   } catch (error) {
     console.error('Decrypt error:', error);
@@ -310,12 +310,12 @@ app.post('/api/resell/purchase-site/model1', authenticateToken, async (req, res)
       }
 
       const userBalance = parseFloat(users[0].balance);
-      
+
       // Get config data for pricing and banners
       const [configs] = await connection.execute(
         'SELECT Model1_price, Model1_1500x1500Banner, Model1_2000x500Banner, Model1_1000x500Banner, Model1_1640x500Banner FROM resell_config ORDER BY id ASC LIMIT 1'
       );
-      
+
       if (configs.length === 0) {
         await connection.rollback();
         connection.release();
@@ -324,7 +324,7 @@ app.post('/api/resell/purchase-site/model1', authenticateToken, async (req, res)
           message: 'Config not found'
         });
       }
-      
+
       const config = configs[0];
       const sitePrice = parseFloat(config.Model1_price);
 
@@ -367,7 +367,7 @@ app.post('/api/resell/purchase-site/model1', authenticateToken, async (req, res)
           'SELECT MAX(CAST(customer_id AS UNSIGNED)) as max_id FROM auth_sites'
         );
         customerId = (maxCustomer[0].max_id || 0) + 1;
-        
+
         // Add 31 days from today for new site
         expiredDay = new Date();
         expiredDay.setDate(expiredDay.getDate() + 31);
@@ -407,65 +407,65 @@ app.post('/api/resell/purchase-site/model1', authenticateToken, async (req, res)
       );
 
       // Insert data into other tables with the same customer_id (only for new sites)
-        try {
-          // Insert into categories table
-          const [categoryResult] = await connection.execute(
-            'INSERT INTO categories (customer_id, title, subtitle, image, category, featured, isActive, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [customerId.toString(), `${website_name} Category`, `Category for ${website_name}`, config.Model1_1640x500Banner || `https://img2.pic.in.th/pic/1640x500ebe7d18bc84a1cf6.png`, `${website_name.toLowerCase()}_category`, 0, 1, 0]
-          );
-          const categoryId = categoryResult.insertId;
-          console.log(`Inserted category for customer_id: ${customerId}`);
+      try {
+        // Insert into categories table
+        const [categoryResult] = await connection.execute(
+          'INSERT INTO categories (customer_id, title, subtitle, image, category, featured, isActive, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [customerId.toString(), `${website_name} Category`, `Category for ${website_name}`, config.Model1_1640x500Banner || `https://img2.pic.in.th/pic/1640x500ebe7d18bc84a1cf6.png`, `${website_name.toLowerCase()}_category`, 0, 1, 0]
+        );
+        const categoryId = categoryResult.insertId;
+        console.log(`Inserted category for customer_id: ${customerId}`);
 
-          // Insert into roles table
-          await connection.execute(
-            'INSERT INTO roles (customer_id, rank_name, can_edit_categories, can_edit_products, can_edit_users, can_edit_orders, can_manage_keys, can_view_reports, can_manage_promotions, can_manage_settings, can_access_reseller_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [customerId.toString(), 'admin', 1, 1, 1, 1, 1, 1, 1, 1, 0]
-          );
-          console.log(`Inserted role for customer_id: ${customerId}`);
+        // Insert into roles table
+        await connection.execute(
+          'INSERT INTO roles (customer_id, rank_name, can_edit_categories, can_edit_products, can_edit_users, can_edit_orders, can_manage_keys, can_view_reports, can_manage_promotions, can_manage_settings, can_access_reseller_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [customerId.toString(), 'admin', 1, 1, 1, 1, 1, 1, 1, 1, 0]
+        );
+        console.log(`Inserted role for customer_id: ${customerId}`);
 
-          // Insert into theme_settings table
-          await connection.execute(
-            'INSERT INTO theme_settings (customer_id, primary_color, secondary_color, background_color, text_color, theme_mode) VALUES (?, ?, ?, ?, ?, ?)',
-            [customerId.toString(), '#2994ff', '#29f8ff', '#FFFFFF', '#000000', 'dark']
-          );
-          console.log(`Inserted theme settings for customer_id: ${customerId}`);
+        // Insert into theme_settings table
+        await connection.execute(
+          'INSERT INTO theme_settings (customer_id, primary_color, secondary_color, background_color, text_color, theme_mode) VALUES (?, ?, ?, ?, ?, ?)',
+          [customerId.toString(), '#2994ff', '#29f8ff', '#FFFFFF', '#000000', 'dark']
+        );
+        console.log(`Inserted theme settings for customer_id: ${customerId}`);
 
-          // Insert into users table (admin user for the site)
-          const hashedPassword = await bcrypt.hash(admin_password, 10);
-          
-          // Auto-convert admin to admin@gmail.com if no @ symbol found
-          let adminEmail = admin_user;
-          if (!admin_user.includes('@')) {
-            adminEmail = `${admin_user}@gmail.com`;
-          }
-          
-          await connection.execute(
-            'INSERT INTO users (customer_id, fullname, email, password, money, points, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [customerId.toString(), `${website_name} Admin`, adminEmail, hashedPassword, 0.00, 0, 'admin']
-          );
-          console.log(`Inserted user for customer_id: ${customerId}`);
+        // Insert into users table (admin user for the site)
+        const hashedPassword = await bcrypt.hash(admin_password, 10);
 
-          // Insert sample product
-          await connection.execute(
-            'INSERT INTO products (customer_id, category_id, title, subtitle, price, reseller_price, stock, duration, image, download_link, isSpecial, featured, isActive, isWarrenty, warrenty_text, primary_color, secondary_color, priority, discount_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [customerId.toString(), categoryId, 'Sample Product', 'This is a sample product for your new site', 10.00, 8.00, 100, '30 days', config.Model1_1500x1500Banner || `https://img5.pic.in.th/file/secure-sv1/1500x1500232d3d161739dfd2.png`, null, 0, 1, 1, 0, null, '#ff0000', '#b3ffc7', 0, 0]
-          );
-          console.log(`Inserted sample product for customer_id: ${customerId}`);
-
-          // Insert config data
-          await connection.execute(
-            'INSERT INTO config (customer_id, owner_phone, site_name, site_logo, meta_title, meta_description, meta_keywords, meta_author, discord_link, discord_webhook, banner_link, banner2_link, banner3_link, navigation_banner_1, navigation_link_1, navigation_banner_2, navigation_link_2, navigation_banner_3, navigation_link_3, navigation_banner_4, navigation_link_4, background_image, footer_image, load_logo, footer_logo, theme, ad_banner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [customerId.toString(), '0000000000', website_name, config.Model1_1500x1500Banner || `https://img5.pic.in.th/file/secure-sv1/1500x1500232d3d161739dfd2.png`, `(⭐) ${website_name} - Digital Store`, `Welcome to ${website_name} - Your trusted digital products store`, 'digital, products, store, gaming', `${website_name} Admin`, null, null, config.Model1_2000x500Banner || 'https://img2.pic.in.th/pic/2000x500172fb60914209eb0.png', config.Model1_2000x500Banner || 'https://img2.pic.in.th/pic/2000x500172fb60914209eb0.png', config.Model1_2000x500Banner || 'https://img2.pic.in.th/pic/2000x500172fb60914209eb0.png', config.Model1_1000x500Banner || 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, config.Model1_1000x500Banner || 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, config.Model1_1000x500Banner || 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, config.Model1_1000x500Banner || 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, null, null, null, null, 'Dark mode', config.Model1_1500x1500Banner || 'https://img5.pic.in.th/file/secure-sv1/1500x1500232d3d161739dfd2.png']
-          );
-          console.log(`Inserted config for customer_id: ${customerId}`);
-
-          console.log(`Successfully inserted additional data for customer_id: ${customerId}`);
-
-        } catch (insertError) {
-          console.error('Error inserting additional data:', insertError);
-          // Don't fail the transaction if additional data insertion fails
-          // Just log the error and continue
+        // Auto-convert admin to admin@gmail.com if no @ symbol found
+        let adminEmail = admin_user;
+        if (!admin_user.includes('@')) {
+          adminEmail = `${admin_user}@gmail.com`;
         }
+
+        await connection.execute(
+          'INSERT INTO users (customer_id, fullname, email, password, money, points, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [customerId.toString(), `${website_name} Admin`, adminEmail, hashedPassword, 0.00, 0, 'admin']
+        );
+        console.log(`Inserted user for customer_id: ${customerId}`);
+
+        // Insert sample product
+        await connection.execute(
+          'INSERT INTO products (customer_id, category_id, title, subtitle, price, reseller_price, stock, duration, image, download_link, isSpecial, featured, isActive, isWarrenty, warrenty_text, primary_color, secondary_color, priority, discount_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [customerId.toString(), categoryId, 'Sample Product', 'This is a sample product for your new site', 10.00, 8.00, 100, '30 days', config.Model1_1500x1500Banner || `https://img5.pic.in.th/file/secure-sv1/1500x1500232d3d161739dfd2.png`, null, 0, 1, 1, 0, null, '#ff0000', '#b3ffc7', 0, 0]
+        );
+        console.log(`Inserted sample product for customer_id: ${customerId}`);
+
+        // Insert config data
+        await connection.execute(
+          'INSERT INTO config (customer_id, owner_phone, site_name, site_logo, meta_title, meta_description, meta_keywords, meta_author, discord_link, discord_webhook, banner_link, banner2_link, banner3_link, navigation_banner_1, navigation_link_1, navigation_banner_2, navigation_link_2, navigation_banner_3, navigation_link_3, navigation_banner_4, navigation_link_4, background_image, footer_image, load_logo, footer_logo, theme, ad_banner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [customerId.toString(), '0000000000', website_name, config.Model1_1500x1500Banner || `https://img5.pic.in.th/file/secure-sv1/1500x1500232d3d161739dfd2.png`, `(⭐) ${website_name} - Digital Store`, `Welcome to ${website_name} - Your trusted digital products store`, 'digital, products, store, gaming', `${website_name} Admin`, null, null, config.Model1_2000x500Banner || 'https://img2.pic.in.th/pic/2000x500172fb60914209eb0.png', config.Model1_2000x500Banner || 'https://img2.pic.in.th/pic/2000x500172fb60914209eb0.png', config.Model1_2000x500Banner || 'https://img2.pic.in.th/pic/2000x500172fb60914209eb0.png', config.Model1_1000x500Banner || 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, config.Model1_1000x500Banner || 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, config.Model1_1000x500Banner || 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, config.Model1_1000x500Banner || 'https://img5.pic.in.th/file/secure-sv1/1000x500.png', null, null, null, null, null, 'Dark mode', config.Model1_1500x1500Banner || 'https://img5.pic.in.th/file/secure-sv1/1500x1500232d3d161739dfd2.png']
+        );
+        console.log(`Inserted config for customer_id: ${customerId}`);
+
+        console.log(`Successfully inserted additional data for customer_id: ${customerId}`);
+
+      } catch (insertError) {
+        console.error('Error inserting additional data:', insertError);
+        // Don't fail the transaction if additional data insertion fails
+        // Just log the error and continue
+      }
 
       // Commit transaction
       await connection.commit();
@@ -536,12 +536,12 @@ app.post('/api/resell/renew-site', authenticateToken, async (req, res) => {
       }
 
       const userBalance = parseFloat(users[0].balance);
-      
+
       // Get config data for resell pricing
       const [configs] = await connection.execute(
         'SELECT Model1_resell_price FROM resell_config ORDER BY id ASC LIMIT 1'
       );
-      
+
       if (configs.length === 0) {
         await connection.rollback();
         connection.release();
@@ -550,7 +550,7 @@ app.post('/api/resell/renew-site', authenticateToken, async (req, res) => {
           message: 'Config not found'
         });
       }
-      
+
       const config = configs[0];
       const sitePrice = parseFloat(config.Model1_resell_price);
 
@@ -862,7 +862,7 @@ app.post('/api/resell/admin/approve-topup/:topup_id', authenticateToken, async (
 // Redeem angpao endpoint
 app.post('/api/resell/redeem-angpao', authenticateToken, async (req, res) => {
   let campaignId; // Declare campaignId at function scope
-  
+
   try {
     const { link } = req.body;
     const userId = req.user.user_id;
@@ -876,7 +876,7 @@ app.post('/api/resell/redeem-angpao', authenticateToken, async (req, res) => {
       "SELECT user_id, balance FROM resell_users WHERE user_id = ?",
       [userId]
     );
-    
+
     if (users.length === 0) {
       return res.status(404).json({ success: false, error: 'ไม่พบผู้ใช้' });
     }
@@ -903,11 +903,11 @@ app.post('/api/resell/redeem-angpao', authenticateToken, async (req, res) => {
     let data;
     let lastError;
     const maxRetries = 3;
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`Calling TrueMoney API (attempt ${attempt}/${maxRetries}): https://api.xpluem.com/${campaignId}/${phone}`);
-        
+
         const response = await fetch(`https://api.xpluem.com/${campaignId}/${phone}`, {
           method: 'GET',
           headers: {
@@ -917,22 +917,22 @@ app.post('/api/resell/redeem-angpao', authenticateToken, async (req, res) => {
           },
           timeout: 15000
         });
-        
+
         data = await response.json();
         console.log(`TrueMoney API Response (attempt ${attempt}):`, data);
-        
+
         // ถ้าได้ response แล้วให้ break ออกจาก loop
         break;
-        
+
       } catch (error) {
         lastError = error;
         console.error(`TrueMoney API attempt ${attempt} failed:`, error.message);
-        
+
         // ถ้าเป็น attempt สุดท้ายให้ throw error
         if (attempt === maxRetries) {
           throw error;
         }
-        
+
         // รอ 2 วินาทีก่อนลองใหม่
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
@@ -950,7 +950,7 @@ app.post('/api/resell/redeem-angpao', authenticateToken, async (req, res) => {
 
       const amount = data.data ? parseFloat(data.data.amount) : 0;
       const status = data.success ? 'success' : 'failed';
-      
+
       // ตรวจสอบจำนวนเงิน
       if (amount <= 0) {
         throw new Error('จำนวนเงินไม่ถูกต้อง');
@@ -975,7 +975,7 @@ app.post('/api/resell/redeem-angpao', authenticateToken, async (req, res) => {
       // ถ้าสำเร็จ ให้บวกเงิน
       if (data.success && (data.message === 'รับเงินสำเร็จ' || data.message === 'success')) {
         const newBalance = parseFloat(users[0].balance) + amount;
-        
+
         // อัปเดตเงินผู้ใช้
         const [updateResult] = await connection.execute(
           'UPDATE resell_users SET balance = ? WHERE user_id = ?',
@@ -1231,8 +1231,8 @@ app.post('/api/resell/admin/config', authenticateToken, async (req, res) => {
     }
 
     // Validate required fields
-    if (!phone_number || !owner_name || !owner_bank || !website_name || 
-        !Model1_price || !Model1_resell_price || !Model1_name) {
+    if (!phone_number || !owner_name || !owner_bank || !website_name ||
+      !Model1_price || !Model1_resell_price || !Model1_name) {
       return res.status(400).json({
         success: false,
         message: 'Required fields: phone_number, owner_name, owner_bank, website_name, Model1_price, Model1_resell_price, Model1_name'
@@ -2101,7 +2101,7 @@ app.get('/api/resell/admin/reports/topups/filtered', authenticateToken, async (r
       LEFT JOIN resell_users u ON t.user_id = u.user_id
       WHERE 1=1
     `;
-    
+
     const queryParams = [];
 
     if (status) {
@@ -2184,7 +2184,7 @@ app.get('/api/resell/admin/reports/transactions/filtered', authenticateToken, as
       LEFT JOIN resell_users u ON t.user_id = u.user_id
       WHERE 1=1
     `;
-    
+
     const queryParams = [];
 
     if (type) {
@@ -2298,10 +2298,10 @@ app.get('/api/auth-sites/:customer_id', async (req, res) => {
     }
 
     const site = sites[0];
-    
+
     // Decrypt password for admin access
     const decryptedPassword = await decryptPassword(site.admin_password);
-    
+
     res.json({
       success: true,
       message: 'Auth site retrieved successfully',
@@ -2422,7 +2422,7 @@ app.delete('/api/auth-sites/:id', authenticateToken, async (req, res) => {
     try {
       // Delete all related data for this customer_id
       // Order matters: delete child tables first, then parent tables
-      
+
       // 1. Delete from products first (has foreign key to categories)
       await connection.execute(
         'DELETE FROM products WHERE customer_id = ?',
@@ -2478,7 +2478,7 @@ app.delete('/api/auth-sites/:id', authenticateToken, async (req, res) => {
           website_name: site.website_name,
           deleted_tables: [
             'products',
-            'categories', 
+            'categories',
             'users',
             'roles',
             'theme_settings',
@@ -2642,13 +2642,13 @@ app.get('/test-db', async (req, res) => {
   try {
     const connection = await pool.getConnection();
     console.log('Database connected successfully!');
-    
+
     // Test query
     const [rows] = await connection.execute('SELECT 1 as test');
     console.log('Test query result:', rows);
-    
+
     connection.release();
-    
+
     res.json({
       success: true,
       message: 'Database connection successful',
