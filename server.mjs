@@ -233,7 +233,6 @@ app.post('/api/resell/login', async (req, res) => {
   }
 });
 
-// Get user profile endpoint
 app.get('/api/resell/myprofile', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.user_id;
@@ -441,7 +440,7 @@ app.post('/api/resell/purchase-site/model1', authenticateToken, async (req, res)
 
         await connection.execute(
           'INSERT INTO users (customer_id, fullname, email, password, money, points, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [customerId.toString(), `${website_name} Admin`, adminEmail, hashedPassword, 0.00, 0, 'admin']
+          [customerId.toString(), `${website_name}`, adminEmail, hashedPassword, 0.00, 0, 'admin']
         );
         console.log(`Inserted user for customer_id: ${customerId}`);
 
